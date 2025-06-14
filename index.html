@@ -1,1 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Roblox-Like Site Simulation</title>
+<style>
+  body { font-family: Arial, sans-serif; margin:0; padding:0; background:#f0f0f0; }
+  header { background:#d33; color:#fff; padding:10px; display:flex; justify-content:space-between; align-items:center; }
+  nav button { margin-left:10px; }
+  #content { padding:20px; max-width:900px; margin:auto; background:#fff; min-height:70vh; }
+  input, button, select { padding:8px; margin:4px 0; width: 100%; max-width: 300px; }
+  .hidden { display:none; }
+  #avatar-preview { width: 100px; height: 100px; background: #ddd; margin-bottom:10px; }
+  #chat-box { border:1px solid #ccc; height:200px; overflow-y:auto; padding:10px; background:#fafafa; }
+  #chat-input { width: calc(100% - 70px); display:inline-block; }
+  #chat-send { width: 60px; display:inline-block; }
+  .chat-message { margin-bottom: 8px; }
+  .chat-message strong { color: #d33; }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  table, th, td { border: 1px solid #ccc; }
+  th, td { padding: 8px; text-align: left; }
+</style>
+</head>
+<body>
 
+<header>
+  <div><strong>RobloxSim</strong></div>
+  <div id="user-controls">
+    <button id="login-btn">Login</button>
+    <button id="signup-btn">Sign Up</button>
+  </div>
+  <div id="user-info" class="hidden">
+    <span id="welcome-msg"></span>
+    <button id="logout-btn">Logout</button>
+  </div>
+</header>
+
+<div id="content">
+
+  <!-- Login Form -->
+  <div id="login-form" class="hidden">
+    <h2>Login</h2>
+    <input type="text" id="login-username" placeholder="Username" />
+    <input type="password" id="login-password" placeholder="Password" />
+    <button id="do-login">Login</button>
+    <button id="cancel-login">Cancel</button>
+    <div id="login-error" style="color:red;"></div>
+  </div>
+
+  <!-- Signup Form -->
+  <div id="signup-form" class="hidden">
+    <h2>Sign Up</h2>
+    <input type="text" id="signup-username" placeholder="Username" />
+    <input type="password" id="signup-password" placeholder="Password" />
+    <button id="do-signup">Sign Up</button>
+    <button id="cancel-signup">Cancel</button>
+    <div id="signup-error" style="color:red;"></div>
+  </div>
+
+  <!-- Main App -->
+  <div id="app" class="hidden">
+    <h2>Welcome, <span id="profile-username"></span></h2>
+
+    <!-- Avatar Editor -->
+    <section>
+      <h3>Avatar Customization</h3>
+      <div id="avatar-preview"></div>
+      <label>Choose Color:</label>
+      <input type="color" id="avatar-color" value="#ff0000" />
+      <button id="save-avatar">Save Avatar</button>
+    </section>
+
+    <!-- Friends List -->
+    <section>
+      <h3>Friends List</h3>
+      <ul id="friends-list"></ul>
+      <input type="text" id="add-friend-username" placeholder="Friend's Username" />
+      <button id="add-friend-btn">Add Friend</button>
+      <div id="friend-error" style="color:red;"></div>
+    </section>
+
+    <!-- Chat -->
+    <section>
+      <h3>Chat</h3>
+      <div id="chat-box"></div>
+      <input type="text" id="chat-input" placeholder="Say something..." />
+      <button id="chat-send">Send</button>
+    </section>
+
+    <!-- Leaderboard -->
+    <section>
+      <h3>Leaderboard</h3>
+      <table>
+        <thead><tr><th>Username</th><th>Score</th></tr></thead>
+        <tbody id="leaderboard-body"></tbody>
+      </table>
+      <button id="increase-score">Increase My Score</button>
+    </section>
+
+    <!-- Game Launcher -->
+    <section>
+      <h3>Game Launcher</h3>
+      <button id="launch-game">Launch Game</button>
+      <div id="game-placeholder" style="margin-top:10px; border: 1px solid #ccc; height: 300px; background: #eee; display:flex; justify-content:center; align-items:center; font-weight:bold; color:#999;">
+        Game engine will load here.
+      </div>
+    </section>
+
+    <!-- News -->
+    <section>
+      <h3>News & Updates</h3>
+      <ul id="news-list">
+        <li>Welcome to RobloxSim! This is a simulation.</li>
+        <li>New avatar colors coming soon.</li>
+        <li>Leaderboard updated monthly.</li>
+      </ul>
+    </section>
+  </div>
+
+</div>
+
+<script>
+  // Helper to get/set users in localStorage
+  function getUsers() {
+    return JSON.parse(localStorage.getItem('users') || '{}');
+  }
+  function setUsers(users) {
+    localStorage.setItem('users', JSON.stringify(users));
+  }
+
+  // Save "current logged in user" to localStorage
+  function setCurrentUser(username) {
+    localStorage.setItem('currentUser', username);
+  }
+  function getCurrentUser() {
+    return localStorage.getItem('currentUser');
+  }
+  function clearCurrentUser() {
+    localStorage.removeItem('currentUser');
+  }
+
+  // Load user data object or create default
+  function getUserData(username) {
+    let users = getUsers();
+    return users[username] || { password:'', avatarColor:'#ff0000', friends:[], chat:[], score: 0 };
+  }
+  function saveUserData(username, data) {
+    let users = getUsers();
+    users[username] = data;
+    setUsers(users);
+  }
+
+  // UI Elements
+  const loginBtn = document.getElementById('login-btn');
+  const signupBtn = document.getElementById('signup-btn');
+  const logoutBtn = document.getElementById('logout-btn');
+  const userControls = document.getElementById('user-controls');
+  const userInfo = document.getElementById('user-info');
+  const welcomeMsg = document.getElementById('welcome-msg');
+  const loginForm = document.getElementById('login-form');
+  const signupForm = document.getElementById('signup-form');
+  const content = document.getElementById('content');
+  const app = document.getElementById('app');
+  const loginError = document.getElementById('login-error');
+  const signupError = document.getElementById('signup-error');
+  const profileUsername = document.getElementById('profile-username');
+  const avatarPreview = document.getElementById('avatar-preview');
+  const avatarColorInput = document.getElementById('avatar-color');
+  const saveAvatarBtn = document.getElementById('save-avatar');
+  const friendsList = document.getElementById('friends-list');
+  const addFriendUsername = document.getElementById('add-friend-username');
+  const addFriendBtn = document.getElementById('add-friend-btn');
+  const friendError = document.getElementById('friend-error');
+  const chatBox = document.getElementById('chat-box');
+  const chatInput = document.getElementById('chat-input');
+  const chatSend = document.getElementById('chat-send');
+  const leaderboardBody = document.getElementById('leaderboard-body');
+  const increaseScoreBtn = document.getElementById('increase-score');
+  const launchGameBtn = document.getElementById('launch-game');
+  const gamePlaceholder = document.getElementById('game-placeholder');
+
+  // State
+  let currentUser = null;
+  let users = getUsers();
+
+  // Show/hide functions
+  function showLogin() {
+    loginForm.classList.remove('hidden');
+    signupForm.classList.add('hidden');
+    app.classList.add('hidden');
+    loginError.textContent = '';
+    signupError.textContent = '';
+  }
+  function showSignup() {
+    signupForm.classList.remove('hidden');
+    loginForm.classList.add('hidden');
+    app.classList.add('hidden');
+    loginError.textContent = '';
+    signupError.textContent = '';
+  }
+  function showApp() {
+    loginForm.classList.add('hidden');
+    signupForm.classList.add('hidden');
+    app.classList.remove('hidden');
+  }
+  function showLoggedOut() {
+    userControls.classList.remove('hidden');
+    userInfo.classList.add('hidden');
+    app.classList.add('hidden');
+  }
+  function showLoggedIn(username) {
+    userControls.classList.add('hidden');
+    userInfo.classList.remove('hidden');
+    welcomeMsg.textContent = 'Logged in as ' + username;
+    profileUsername.textContent = username;
+    avatarColorInput.value = getUserData(username).avatarColor || '#ff0000';
+    currentUser = username;
+    loadFriends();
+    loadChat();
+    loadLeaderboard();
+    showApp();
+  }
+
+  // Login handler
+  loginBtn.onclick = () => showLogin();
+  signupBtn.onclick = () => showSignup();
+  logoutBtn.onclick = () => {
+    clearCurrentUser();
+    currentUser = null;
+    showLoggedOut();
+  };
+  document.getElementById('cancel-login').onclick = () => showLoggedOut();
+  document.getElementById('cancel-signup').onclick = () => showLoggedOut();
+
+  document.getElementById('do-login').onclick = () => {
+    const u = document.getElementById('login-username').value.trim();
+    const p = document.getElementById('login-password').value;
+    const users = getUsers();
+    if(!u || !p) {
+      loginError.textContent = 'Fill in all fields.';
+      return;
+    }
+    if(users[u] && users[u].password === p) {
+      setCurrentUser(u);
+      showLoggedIn(u);
+    } else {
+      loginError.textContent = 'Invalid username or password.';
+    }
+  };
+
+  document.getElementById('do-signup').onclick = () => {
+    const u = document.getElementById('signup-username').value.trim();
+    const p = document.getElementById('signup-password').value;
+    let users = getUsers();
+    if(!u || !p) {
+      signupError.textContent = 'Fill in all fields.';
+      return;
+    }
+    if(users[u]) {
+      signupError.textContent = 'Username already taken.';
+      return;
+    }
+    users[u] = { password: p, avatarColor: '#ff0000', friends: [], chat: [], score: 0 };
+    setUsers(users);
+    setCurrentUser(u);
+    showLoggedIn(u);
+  };
+
+  // Avatar customization
+  saveAvatarBtn.onclick = () => {
+    if(!currentUser) return;
+    let data = getUserData(currentUser);
+    data.avatarColor = avatarColorInput.value;
+    saveUserData(currentUser, data);
+    alert('Avatar saved!');
+    updateAvatarPreview();
+  };
+
+  function updateAvatarPreview() {
+    if(!currentUser) return;
+    let color = getUserData(currentUser).avatarColor || '#ff0000';
+    avatarPreview.style.backgroundColor = color;
+  }
+
+  // Friends list
+  function loadFriends() {
+    if(!currentUser) return;
+    friendsList.innerHTML = '';
+    let friends = getUserData(currentUser).friends || [];
+    if(friends.length === 0) friendsList.innerHTML = '<li>No friends added.</li>';
+    else {
+      friends.forEach(f => {
+        let li = document.createElement('li');
+        li.textContent = f;
+        friendsList.appendChild(li);
+      });
+    }
+  }
+
+  addFriendBtn.onclick = () => {
+    friendError.textContent = '';
+    if(!currentUser) return;
+    let friendName = addFriendUsername.value.trim();
+    if(!friendName) {
+      friendError.textContent = 'Enter a username.';
+      return;
+    }
+    let users = getUsers();
+    if(!users[friendName]) {
+      friendError.textContent = 'User not found.';
+      return;
+    }
+    let data = getUserData(currentUser);
+    if(data.friends.includes(friendName)) {
+      friendError.textContent = 'Already friends.';
+      return;
+    }
+    data.friends.push(friendName);
+    saveUserData(currentUser, data);
+    addFriendUsername.value = '';
+    loadFriends();
+  };
+
+  // Chat simulation (local only)
+  function loadChat() {
+    if(!currentUser) return;
+    chatBox.innerHTML = '';
+    let data = getUserData(currentUser);
+    let chat = data.chat || [];
+    chat.forEach(m => {
+      let div = document.createElement('div');
+      div.className = 'chat-message';
+      div.innerHTML = `<strong>${m.user}:</strong> ${m.text}`;
+      chatBox.appendChild(div);
+    });
+    chatBox.scrollTop = chatBox.scrollHeight;
+  }
+
+  chatSend.onclick = () => {
+    if(!currentUser) return;
+    let text = chatInput.value.trim();
+    if(!text) return;
+    let data = getUserData(currentUser);
+    data.chat = data.chat || [];
+    data.chat.push({user: currentUser, text: text});
+    saveUserData(currentUser, data);
+    chatInput.value = '';
+    loadChat();
+  };
+
+  // Leaderboard simulation
+  function loadLeaderboard() {
+    leaderboardBody.innerHTML = '';
+    let users = getUsers();
+    // Sort users by score desc
+    let sorted = Object.entries(users).sort((a,b) => (b[1].score || 0) - (a[1].score || 0));
+    sorted.forEach(([u,d]) => {
+      let tr = document.createElement('tr');
+      tr.innerHTML = `<td>${u}</td><td>${d.score || 0}</td>`;
+      leaderboardBody.appendChild(tr);
+    });
+  }
+
+  increaseScoreBtn.onclick = () => {
+    if(!currentUser) return;
+    let data = getUserData(currentUser);
+    data.score = (data.score || 0) + 10;
+    saveUserData(currentUser, data);
+    loadLeaderboard();
+  };
+
+  // Game launcher button
+  launchGameBtn.onclick = () => {
+    alert('Launching game engine simulation...');
+    gamePlaceholder.textContent = 'Game engine would load here. (Simulation)';
+  };
+
+  // On load: check if logged in
+  window.onload = () => {
+    let user = getCurrentUser();
+    if(user && getUsers()[user]) {
+      showLoggedIn(user);
+      updateAvatarPreview();
+    } else {
+      showLoggedOut();
+    }
+  };
+</script>
+
+</body>
+</html>
